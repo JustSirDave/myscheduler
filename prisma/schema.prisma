@@ -1,0 +1,124 @@
+// MyScheduler — Prisma schema (Foundation phase)
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Planner
+// ---------------------------------------------------------------------------
+
+enum PlannerItemType {
+  Task
+  Habit
+  TimeBlock
+  Goal
+}
+
+enum Horizon {
+  Daily
+  Weekly
+  Monthly
+}
+
+enum Priority {
+  High
+  Medium
+  Low
+}
+
+enum Status {
+  NotStarted
+  InProgress
+  Done
+}
+
+enum Origin {
+  Local
+  GoogleCalendar
+}
+
+model PlannerItem {
+  id       String          @id @default(cuid())
+  name     String
+  type     PlannerItemType
+  // Plain string, not an enum — the project list will change over time.
+  project  String?
+  startAt  DateTime?
+  endAt    DateTime?
+  isAllDay Boolean         @default(false)
+  horizon  Horizon?
+  priority Priority?
+  status   Status          @default(NotStarted)
+  notes    String?
+
+  // Self-relation: a Task/TimeBlock can ladder up to a Goal.
+  linkedGoalId String?
+  linkedGoal   PlannerItem?  @relation("GoalLink", fields: [linkedGoalId], references: [id], onDelete: SetNull)
+  linkedItems  PlannerItem[] @relation("GoalLink")
+
+  // Reserved for next-phase Google Calendar two-way sync. Not used yet, but
+  // present now so calendar sync doesn't require a schema migration later.
+  googleEventId String? @unique
+  origin        Origin  @default(Local)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([startAt])
+}
+
+// ---------------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------------
+
+enum ExpenseType {
+  Expense
+  Income
+}
+
+enum ExpenseCategory {
+  Business
+  Food
+  Transport
+  Subscriptions
+  Personal
+  Housing
+  Other
+}
+
+enum PaymentMethod {
+  Cash
+  BankTransfer
+  Card
+  POS
+}
+
+model Expense {
+  id   String      @id @default(cuid())
+  name String
+  type ExpenseType
+  // Naira stored as kobo (naira × 100) as an integer to avoid float rounding.
+  amountKobo    Int
+  category      ExpenseCategory
+  // Plain string, not an enum — projects change over time.
+  project       String?
+  paymentMethod PaymentMethod
+  date          DateTime
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([category])
+  @@index([date])
+}
