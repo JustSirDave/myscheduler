@@ -16,8 +16,8 @@ This phase proves the plumbing works end to end. It is deliberately minimal:
 - **Prisma schema** for `PlannerItem` and `Expense` (+ enums), with an initial
   migration in [`prisma/migrations`](prisma/migrations).
 - **Single-password auth** — no signup, no user table. A signed, httpOnly
-  session cookie is issued on a correct password; `middleware.ts` gates every
-  route and redirects to `/login` otherwise.
+  session cookie is issued on a correct password; `proxy.ts` (Next 16's renamed
+  middleware convention) gates every route and redirects to `/login` otherwise.
 - **`/login`** — password form.
 - **`/`** — protected placeholder that proves the session *and* the database
   both work: it shows live `PlannerItem` and `Expense` row counts pulled from
