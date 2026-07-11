@@ -7,7 +7,9 @@ import { logout } from "@/app/(app)/actions";
 const links = [
   { href: "/", label: "Home" },
   { href: "/planner", label: "Planner" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/expenses", label: "Expenses" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export function Nav() {

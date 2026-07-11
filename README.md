@@ -46,20 +46,40 @@ Data entry is now built on top of the foundation:
 Verified end-to-end in the browser (create → edit → status toggle → delete,
 ₦1,500.50 → 150050 kobo, net math, filters, mobile 390px) and `npm run build`.
 
+## Current status — Calendar views + Google Calendar sync ✅
+
+- **Today / Week / Month views** — `/calendar` (`?view=month|week&date=`) with a
+  real month grid and a week time-grid (items positioned by start/end), prev /
+  next / today nav. Helpers in `lib/calendar.ts`.
+- **Dashboard** (`/`) — Today agenda **beside** a mini month calendar
+  (side-by-side ≥1024px, stacked on mobile).
+- **Google Calendar two-way sync** (dependency-free, just `fetch`):
+  - Connect via OAuth on `/settings`; single-row `GoogleAccount` token store.
+  - **Inbound**: `pullEvents()` (incremental via `syncToken`) upserts Google
+    events as `TimeBlock`s, idempotent on `googleEventId`. Runs on Vercel Cron
+    (`/api/cron/sync`, guarded by `CRON_SECRET`) and via a **Sync now** button.
+  - **Outbound**: creating/editing/deleting a local item with a time pushes to
+    Google instantly (best-effort; never blocks a save). See `lib/google.ts`,
+    `lib/gcal-sync.ts`.
+- **Graceful when unconfigured**: with no `GOOGLE_CLIENT_ID`, `/settings` shows a
+  setup checklist and everything else works normally — sync just stays dormant.
+
+**To turn on Google sync** (one-time, by you): create a Web OAuth client in Google
+Cloud Console (enable Calendar API, OAuth consent screen → Testing + add yourself
+as a test user), set redirect URIs `http://localhost:3000/api/google/callback` and
+`https://myscheduler-five.vercel.app/api/google/callback`, then set
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and a random `CRON_SECRET` in `.env`
+and in Vercel. Then open `/settings` → **Connect Google Calendar**.
+
 ## Not yet built (next-phase work)
 
 Intentionally out of scope for now — do not assume these exist:
 
-- Google Calendar **two-way sync** (OAuth, inbound cron pull, outbound event writes)
-- **Web Push** notifications (service worker, VAPID keys, subscription flow)
-- **Today / Week / Month / Calendar** grid views and the side-by-side dashboard layout
+- **Web Push** notifications (service worker, VAPID keys, subscription flow) + reminder scheduling
 - **Habit streak** logic (mark done/day + current streak)
 - **Goal detail view** listing all linked items (the linking select exists; a
   dedicated goal dashboard does not)
 - CSV export, drag-to-reschedule, command palette, dark-mode toggle
-
-The schema already reserves `googleEventId` and `origin` on `PlannerItem` so
-calendar sync won't need a migration later.
 
 ---
 

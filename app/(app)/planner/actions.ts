@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { parseDateInput } from "@/lib/dates";
+import { syncItemOutbound, deleteItemOutbound } from "@/lib/gcal-sync";
 import {
   PlannerItemType,
   Horizon,
@@ -54,8 +55,11 @@ export async function createPlannerItem(formData: FormData) {
   const data = parsePlannerData(formData);
   if (!data) redirect("/planner?error=invalid");
 
-  await prisma.plannerItem.create({ data });
+  const created = await prisma.plannerItem.create({ data });
+  await safeOutbound(() => syncItemOutbound(created.id));
+
   revalidatePath("/planner");
+  revalidatePath("/calendar");
   revalidatePath("/");
   redirect("/planner");
 }
@@ -70,8 +74,11 @@ export async function updatePlannerItem(formData: FormData) {
   if (data.linkedGoalId === id) data.linkedGoalId = null;
 
   await prisma.plannerItem.update({ where: { id }, data });
+  await safeOutbound(() => syncItemOutbound(id));
+
   revalidatePath("/planner");
   revalidatePath(`/planner/${id}`);
+  revalidatePath("/calendar");
   revalidatePath("/");
   redirect("/planner");
 }
@@ -80,13 +87,32 @@ export async function deletePlannerItem(formData: FormData) {
   await requireSession();
   const id = str(formData.get("id"));
   if (id) {
+    const existing = await prisma.plannerItem.findUnique({
+      where: { id },
+      select: { googleEventId: true, origin: true },
+    });
     // Children linked to this (if it's a goal) have linkedGoalId set null via
     // the schema's onDelete: SetNull.
     await prisma.plannerItem.delete({ where: { id } });
+
+    // Only remove the remote event for items we pushed out (origin Local).
+    if (existing?.googleEventId && existing.origin === "Local") {
+      await safeOutbound(() => deleteItemOutbound(existing.googleEventId!));
+    }
   }
   revalidatePath("/planner");
+  revalidatePath("/calendar");
   revalidatePath("/");
   redirect("/planner");
+}
+
+// Google sync must never block or fail a local mutation — swallow and log.
+async function safeOutbound(fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    console.error("Google outbound sync failed:", e);
+  }
 }
 
 export async function setPlannerStatus(formData: FormData) {

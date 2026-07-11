@@ -2,130 +2,167 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatKobo } from "@/lib/money";
 import { currentMonthString, monthRange } from "@/lib/dates";
+import {
+  WEEKDAY_LABELS,
+  MONTH_LABELS,
+  addDays,
+  isSameDay,
+  monthGridDays,
+  startOfDay,
+  toDateParam,
+} from "@/lib/calendar";
 
 export const dynamic = "force-dynamic";
 
-type DashboardData =
-  | {
-      ok: true;
-      plannerItems: number;
-      expenses: number;
-      monthSpendKobo: number;
-      monthIncomeKobo: number;
-    }
-  | { ok: false; error: string };
-
-async function loadDashboard(): Promise<DashboardData> {
-  try {
-    const { start, end } = monthRange(currentMonthString());
-    const [plannerItems, expenses, spend, income] = await Promise.all([
-      prisma.plannerItem.count(),
-      prisma.expense.count(),
-      prisma.expense.aggregate({
-        _sum: { amountKobo: true },
-        where: { type: "Expense", date: { gte: start, lt: end } },
-      }),
-      prisma.expense.aggregate({
-        _sum: { amountKobo: true },
-        where: { type: "Income", date: { gte: start, lt: end } },
-      }),
-    ]);
-    return {
-      ok: true,
-      plannerItems,
-      expenses,
-      monthSpendKobo: spend._sum.amountKobo ?? 0,
-      monthIncomeKobo: income._sum.amountKobo ?? 0,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Unknown database error",
-    };
-  }
+function timeLabel(d: Date): string {
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function Home() {
-  const data = await loadDashboard();
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const todayEnd = addDays(todayStart, 1);
+
+  const grid = monthGridDays(now);
+  const gridStart = grid[0];
+  const gridEnd = addDays(grid[41], 1);
+  const { start: monthStart, end: monthEnd } = monthRange(currentMonthString());
+
+  const [todayItems, monthItems, spend, income] = await Promise.all([
+    prisma.plannerItem.findMany({
+      where: { startAt: { gte: todayStart, lt: todayEnd } },
+      orderBy: [{ isAllDay: "desc" }, { startAt: "asc" }],
+      select: { id: true, name: true, type: true, isAllDay: true, startAt: true },
+    }),
+    prisma.plannerItem.findMany({
+      where: { startAt: { gte: gridStart, lt: gridEnd } },
+      select: { startAt: true },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amountKobo: true },
+      where: { type: "Expense", date: { gte: monthStart, lt: monthEnd } },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amountKobo: true },
+      where: { type: "Income", date: { gte: monthStart, lt: monthEnd } },
+    }),
+  ]);
+
+  const daysWithItems = new Set(
+    monthItems.map((i) => (i.startAt ? toDateParam(i.startAt) : "")),
+  );
 
   return (
-    <main className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Your planner and expenses at a glance.
-        </p>
+    <main className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Today</h1>
+          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+            {now.toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+        <div className="flex gap-4 text-sm">
+          <span className="text-black/60 dark:text-white/60">
+            Spent: <span className="font-medium text-red-600 dark:text-red-400">{formatKobo(spend._sum.amountKobo ?? 0)}</span>
+          </span>
+          <span className="text-black/60 dark:text-white/60">
+            Income: <span className="font-medium text-green-600 dark:text-green-400">{formatKobo(income._sum.amountKobo ?? 0)}</span>
+          </span>
+        </div>
       </header>
 
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              data.ok ? "bg-green-500" : "bg-red-500"
-            }`}
-            aria-hidden
-          />
-          <h2 className="text-sm font-medium text-black/70 dark:text-white/70">
-            {data.ok ? "Connected to Postgres" : "Database unreachable"}
-          </h2>
-        </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Today agenda */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Agenda</h2>
+          {todayItems.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-black/15 p-6 text-center text-sm text-black/50 dark:border-white/15 dark:text-white/50">
+              Nothing scheduled today.{" "}
+              <Link href="/planner" className="underline underline-offset-4">
+                Add something
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="divide-y divide-black/10 rounded-xl border border-black/10 dark:divide-white/10 dark:border-white/10">
+              {todayItems.map((i) => (
+                <li key={i.id}>
+                  <Link
+                    href={`/planner/${i.id}`}
+                    className="flex items-center gap-3 p-3 transition hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <span className="w-14 shrink-0 text-xs tabular-nums text-black/50 dark:text-white/50">
+                      {i.isAllDay || !i.startAt ? "all-day" : timeLabel(i.startAt)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{i.name}</span>
+                    <span className="rounded bg-black/5 px-1.5 py-0.5 text-[11px] dark:bg-white/10">
+                      {i.type}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-        {data.ok ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label="Planner items" value={String(data.plannerItems)} />
-            <Stat label="Expense records" value={String(data.expenses)} />
-            <Stat label="Spent this month" value={formatKobo(data.monthSpendKobo)} />
-            <Stat label="Income this month" value={formatKobo(data.monthIncomeKobo)} />
+        {/* Mini month calendar */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">
+              {MONTH_LABELS[now.getMonth()]} {now.getFullYear()}
+            </h2>
+            <Link
+              href="/calendar"
+              className="text-xs text-black/50 underline-offset-4 hover:underline dark:text-white/50"
+            >
+              Open calendar →
+            </Link>
           </div>
-        ) : (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-400">
-            <p className="font-medium">Could not read from the database.</p>
-            <p className="mt-1 break-words font-mono text-xs opacity-80">{data.error}</p>
+          <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
+            <div className="grid grid-cols-7 border-b border-black/10 text-[10px] text-black/40 dark:border-white/10 dark:text-white/40">
+              {WEEKDAY_LABELS.map((w) => (
+                <div key={w} className="py-1 text-center">
+                  {w[0]}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {grid.map((day, idx) => {
+                const inMonth = day.getMonth() === now.getMonth();
+                const isToday = isSameDay(day, todayStart);
+                const hasItems = daysWithItems.has(toDateParam(day));
+                return (
+                  <Link
+                    key={idx}
+                    href={`/calendar?view=week&date=${toDateParam(day)}`}
+                    className={`flex aspect-square flex-col items-center justify-center border-b border-r border-black/[.06] text-xs transition last:border-r-0 hover:bg-black/5 dark:border-white/[.06] dark:hover:bg-white/5 ${
+                      idx % 7 === 6 ? "border-r-0" : ""
+                    } ${inMonth ? "" : "text-black/30 dark:text-white/30"}`}
+                  >
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                        isToday ? "bg-foreground font-semibold text-background" : ""
+                      }`}
+                    >
+                      {day.getDate()}
+                    </span>
+                    <span
+                      className={`mt-0.5 h-1 w-1 rounded-full ${
+                        hasItems ? "bg-blue-500" : "bg-transparent"
+                      }`}
+                    />
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <QuickLink
-          href="/planner"
-          title="Planner →"
-          body="Tasks, habits, time blocks, and goals. Create, edit, and track status."
-        />
-        <QuickLink
-          href="/expenses"
-          title="Expenses →"
-          body="Log naira expenses and income. Filter totals by month, category, and project."
-        />
-      </section>
+        </section>
+      </div>
     </main>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      <div className="mt-1 text-xs text-black/60 dark:text-white/60">{label}</div>
-    </div>
-  );
-}
-
-function QuickLink({
-  href,
-  title,
-  body,
-}: {
-  href: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-xl border border-black/10 p-5 transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-    >
-      <div className="font-medium">{title}</div>
-      <p className="mt-1 text-sm text-black/60 dark:text-white/60">{body}</p>
-    </Link>
   );
 }

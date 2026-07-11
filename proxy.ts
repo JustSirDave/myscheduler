@@ -19,9 +19,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except the login page, Next internals, and static assets.
-  // The login server action posts back to /login, so it stays reachable while
-  // logged out (a matcher that excludes a path also skips Server Functions on
-  // that path).
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
+  // Run on everything except the login page, API routes, Next internals, and
+  // static assets. `api` is excluded so the cookieless Vercel Cron call to
+  // /api/cron/sync (and the Google OAuth callback) isn't bounced to /login —
+  // those route handlers self-protect (session for connect/callback,
+  // CRON_SECRET for cron). The login server action also posts back to /login,
+  // so it stays reachable while logged out.
+  matcher: ["/((?!login|api|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
 };
