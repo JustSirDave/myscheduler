@@ -27,16 +27,35 @@ Verified locally: unauthenticated → redirect to `/login`; wrong password →
 error; correct password → session set and live DB counts render; sign out →
 back to `/login`.
 
+## Current status — Planner & Expense CRUD ✅
+
+Data entry is now built on top of the foundation:
+
+- **Authenticated app shell** — route group `app/(app)` with a shared nav
+  (Home · Planner · Expenses · Sign out).
+- **Planner** (`/planner`) — list with type/status filters, quick-add, inline
+  status toggle, and a full edit page (`/planner/[id]`) covering dates, horizon,
+  priority, notes, and goal-linking (`linkedGoalId`). Create / edit / delete for
+  every item type.
+- **Expenses** (`/expenses`) — quick-add, month/category/project filters, and
+  income/expense/net totals. Full edit page (`/expenses/[id]`). Naira is entered
+  as decimals and stored as integer kobo (`lib/money.ts`).
+- All mutations are **Server Actions** that re-check the session
+  (`lib/session.ts` → `requireSession()`), not just the proxy.
+
+Verified end-to-end in the browser (create → edit → status toggle → delete,
+₦1,500.50 → 150050 kobo, net math, filters, mobile 390px) and `npm run build`.
+
 ## Not yet built (next-phase work)
 
-Intentionally out of scope for the Foundation phase — do not assume these exist:
+Intentionally out of scope for now — do not assume these exist:
 
 - Google Calendar **two-way sync** (OAuth, inbound cron pull, outbound event writes)
 - **Web Push** notifications (service worker, VAPID keys, subscription flow)
-- **Today / Week / Month / Calendar** views and the side-by-side dashboard layout
-- **Habit streak** logic
-- **Goal-linking** UI (the `linkedGoalId` self-relation exists in the schema, but no UI)
-- **Expense UI** and **planner CRUD** UIs
+- **Today / Week / Month / Calendar** grid views and the side-by-side dashboard layout
+- **Habit streak** logic (mark done/day + current streak)
+- **Goal detail view** listing all linked items (the linking select exists; a
+  dedicated goal dashboard does not)
 - CSV export, drag-to-reschedule, command palette, dark-mode toggle
 
 The schema already reserves `googleEventId` and `origin` on `PlannerItem` so
