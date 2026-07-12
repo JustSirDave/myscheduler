@@ -48,6 +48,16 @@ function toEventBody(item: PlannerItem): Record<string, unknown> {
     body.end = { dateTime: end.toISOString() };
   }
 
+  // A per-item lead time becomes a popup notification on the Google event.
+  if (item.reminderMinutes != null) {
+    body.reminders = {
+      useDefault: false,
+      overrides: [{ method: "popup", minutes: item.reminderMinutes }],
+    };
+  } else {
+    body.reminders = { useDefault: true };
+  }
+
   return body;
 }
 
@@ -80,20 +90,43 @@ function fromEvent(ev: GoogleEvent): {
 // Outbound: MyScheduler → Google
 // ---------------------------------------------------------------------------
 
+// Only these planner types live on the calendar (two-way). Task/Goal stay local.
+const CALENDAR_TYPES: readonly string[] = ["Event", "Alarm", "Reminder"];
+
 /**
- * Push or update the given item on Google Calendar. Only acts on locally-created
- * items with a start time; no-ops (returns) if not connected. Best-effort — the
- * caller should wrap in try/catch so a Google outage never blocks a local save.
+ * Reconcile a single item with Google Calendar. Keyed off type + start time, not
+ * origin, so items synced *in* from Google can also be edited/removed here (true
+ * two-way). No-ops if not connected. Best-effort — the caller wraps in try/catch
+ * so a Google outage never blocks a local save.
+ *
+ * - calendar type + has startAt: create (no googleEventId) or patch (has one)
+ * - otherwise, but has a googleEventId: it's no longer a calendar item (retyped to
+ *   Task/Goal, or the time was cleared) → delete the remote event and unlink.
  */
 export async function syncItemOutbound(itemId: string): Promise<void> {
   const account = await getAccount();
   if (!account) return;
 
   const item = await prisma.plannerItem.findUnique({ where: { id: itemId } });
-  if (!item || item.origin !== "Local" || !item.startAt) return;
+  if (!item) return;
+
+  const cal = encodeURIComponent(account.calendarId);
+  const belongsOnCalendar = CALENDAR_TYPES.includes(item.type) && !!item.startAt;
+
+  if (!belongsOnCalendar) {
+    if (item.googleEventId) {
+      await calendarFetch(account, `/calendars/${cal}/events/${item.googleEventId}`, {
+        method: "DELETE",
+      });
+      await prisma.plannerItem.update({
+        where: { id: item.id },
+        data: { googleEventId: null },
+      });
+    }
+    return;
+  }
 
   const body = toEventBody(item);
-  const cal = encodeURIComponent(account.calendarId);
 
   if (item.googleEventId) {
     await calendarFetch(account, `/calendars/${cal}/events/${item.googleEventId}`, {
@@ -203,7 +236,7 @@ export async function pullEvents(): Promise<PullResult> {
         where: { googleEventId: ev.id },
         create: {
           name: ev.summary ?? "(no title)",
-          type: "TimeBlock",
+          type: "Event",
           origin: "GoogleCalendar",
           googleEventId: ev.id,
           notes: ev.description ?? null,

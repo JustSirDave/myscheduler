@@ -117,6 +117,23 @@ export default async function EditPlannerItemPage({
           </select>
         </Field>
 
+        <Field
+          label="Remind (min before)"
+          htmlFor="reminderMinutes"
+          hint="Popup notification on the Google event (Event/Alarm/Reminder)."
+        >
+          <input
+            id="reminderMinutes"
+            name="reminderMinutes"
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={item.reminderMinutes ?? ""}
+            placeholder="e.g. 10"
+            className={controlClass}
+          />
+        </Field>
+
         <label className="flex items-center gap-2 sm:col-span-2">
           <input
             type="checkbox"

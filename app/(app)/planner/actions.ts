@@ -22,6 +22,13 @@ function nullableStr(v: FormDataEntryValue | null): string | null {
   return s === "" ? null : s;
 }
 
+function nullableInt(v: FormDataEntryValue | null): number | null {
+  const s = str(v);
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
 function oneOf<T extends string>(
   enumObj: Record<string, T>,
   v: FormDataEntryValue | null,
@@ -46,6 +53,7 @@ function parsePlannerData(formData: FormData) {
     priority: oneOf(Priority, formData.get("priority")),
     status: oneOf(Status, formData.get("status")) ?? Status.NotStarted,
     notes: nullableStr(formData.get("notes")),
+    reminderMinutes: nullableInt(formData.get("reminderMinutes")),
     linkedGoalId: nullableStr(formData.get("linkedGoalId")),
   };
 }
@@ -89,14 +97,15 @@ export async function deletePlannerItem(formData: FormData) {
   if (id) {
     const existing = await prisma.plannerItem.findUnique({
       where: { id },
-      select: { googleEventId: true, origin: true },
+      select: { googleEventId: true },
     });
     // Children linked to this (if it's a goal) have linkedGoalId set null via
     // the schema's onDelete: SetNull.
     await prisma.plannerItem.delete({ where: { id } });
 
-    // Only remove the remote event for items we pushed out (origin Local).
-    if (existing?.googleEventId && existing.origin === "Local") {
+    // Remove the linked Google event too — whether it was created here or synced
+    // in — so deleting a calendar item in the app also clears it from Google.
+    if (existing?.googleEventId) {
       await safeOutbound(() => deleteItemOutbound(existing.googleEventId!));
     }
   }

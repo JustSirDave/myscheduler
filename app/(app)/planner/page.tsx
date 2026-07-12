@@ -72,12 +72,29 @@ export default async function PlannerPage({
             </Field>
           </div>
           <Field label="Type" htmlFor="type">
-            <select id="type" name="type" required defaultValue="Task" className={controlClass}>
+            <select id="type" name="type" required defaultValue="Event" className={controlClass}>
               <EnumOptions values={typeValues} />
             </select>
           </Field>
           <Field label="Project" htmlFor="project">
             <input id="project" name="project" className={controlClass} />
+          </Field>
+          <Field label="Start" htmlFor="startAt" hint="Event/Alarm/Reminder need a time to sync to Google.">
+            <input id="startAt" name="startAt" type="datetime-local" className={controlClass} />
+          </Field>
+          <Field label="End" htmlFor="endAt">
+            <input id="endAt" name="endAt" type="datetime-local" className={controlClass} />
+          </Field>
+          <Field label="Remind (min before)" htmlFor="reminderMinutes">
+            <input
+              id="reminderMinutes"
+              name="reminderMinutes"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="e.g. 10"
+              className={controlClass}
+            />
           </Field>
           <Field label="Priority" htmlFor="priority">
             <select id="priority" name="priority" className={controlClass}>
@@ -89,7 +106,7 @@ export default async function PlannerPage({
               <EnumOptions values={statusValues} />
             </select>
           </Field>
-          <div className="flex items-end sm:col-span-2 lg:col-span-2">
+          <div className="flex items-end sm:col-span-2 lg:col-span-1">
             <SubmitButton>Add item</SubmitButton>
           </div>
         </form>

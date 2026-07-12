@@ -15,9 +15,10 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum PlannerItemType {
+  Event
+  Alarm
+  Reminder
   Task
-  Habit
-  TimeBlock
   Goal
 }
 
@@ -57,6 +58,10 @@ model PlannerItem {
   priority Priority?
   status   Status          @default(NotStarted)
   notes    String?
+
+  // Lead time in minutes for a popup notification on the pushed Google event.
+  // Used by Event/Alarm/Reminder when synced out; null = Google's default.
+  reminderMinutes Int?
 
   // Self-relation: a Task/TimeBlock can ladder up to a Goal.
   linkedGoalId String?
