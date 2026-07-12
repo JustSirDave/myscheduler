@@ -3,6 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatKobo } from "@/lib/money";
 import { currentMonthString, monthRange, toDateInputValue } from "@/lib/dates";
+import { APP_TZ } from "@/lib/tz";
 import {
   ExpenseType,
   ExpenseCategory,
@@ -179,6 +180,7 @@ export default async function ExpensesPage({
                       item.paymentMethod,
                       item.project,
                       item.date.toLocaleDateString("en-GB", {
+                        timeZone: APP_TZ,
                         day: "2-digit",
                         month: "short",
                       }),

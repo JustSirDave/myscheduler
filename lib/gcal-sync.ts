@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { calendarFetch, getAccount } from "@/lib/google";
+import { watInstant, watDateString } from "@/lib/tz";
 import type { GoogleAccount, PlannerItem } from "@/lib/generated/prisma/client";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Maps between our PlannerItem rows and Google Calendar events, and runs the
 // two-way sync. Outbound: origin=Local items with a start time. Inbound: Google
@@ -21,10 +24,6 @@ interface GoogleEvent {
   end?: GoogleEventDate;
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 /** Build the event body Google expects from a PlannerItem. */
 function toEventBody(item: PlannerItem): Record<string, unknown> {
   const body: Record<string, unknown> = {
@@ -33,13 +32,11 @@ function toEventBody(item: PlannerItem): Record<string, unknown> {
   };
 
   if (item.isAllDay && item.startAt) {
-    const d = item.startAt;
-    const startDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    // Google all-day end date is exclusive; default to the next day.
+    // All-day events use WAT calendar dates. Google's end date is exclusive, so
+    // add a day.
+    const startDate = watDateString(item.startAt);
     const endBase = item.endAt ?? item.startAt;
-    const e = new Date(endBase);
-    e.setDate(e.getDate() + 1);
-    const endDate = `${e.getFullYear()}-${pad(e.getMonth() + 1)}-${pad(e.getDate())}`;
+    const endDate = watDateString(new Date(endBase.getTime() + DAY_MS));
     body.start = { date: startDate };
     body.end = { date: endDate };
   } else if (item.startAt) {
@@ -70,12 +67,12 @@ function fromEvent(ev: GoogleEvent): {
   const startAllDay = ev.start?.date;
   if (startAllDay) {
     const [y, m, d] = startAllDay.split("-").map(Number);
-    const start = new Date(y, m - 1, d);
+    const start = watInstant(y, m - 1, d); // WAT midnight
     let end: Date | null = null;
     if (ev.end?.date) {
       const [ey, em, ed] = ev.end.date.split("-").map(Number);
       // Google all-day end is exclusive; step back one day for our inclusive model.
-      end = new Date(ey, em - 1, ed - 1);
+      end = watInstant(ey, em - 1, ed - 1);
     }
     return { startAt: start, endAt: end, isAllDay: true };
   }

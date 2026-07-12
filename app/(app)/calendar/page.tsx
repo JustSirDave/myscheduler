@@ -14,6 +14,7 @@ import {
   toDateParam,
   weekDays,
 } from "@/lib/calendar";
+import { APP_TZ, watYear, watMonth, watDate, watDay } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function CalendarPage({
 
   const label =
     view === "month"
-      ? `${MONTH_LABELS[cursor.getMonth()]} ${cursor.getFullYear()}`
+      ? `${MONTH_LABELS[watMonth(cursor)]} ${watYear(cursor)}`
       : weekLabel(cursor);
 
   return (
@@ -107,9 +108,8 @@ function weekLabel(cursor: Date): string {
   const days = weekDays(cursor);
   const a = days[0];
   const b = days[6];
-  const fmt = (d: Date) =>
-    `${MONTH_LABELS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
-  return `${fmt(a)} – ${fmt(b)}, ${b.getFullYear()}`;
+  const fmt = (d: Date) => `${MONTH_LABELS[watMonth(d)].slice(0, 3)} ${watDate(d)}`;
+  return `${fmt(a)} – ${fmt(b)}, ${watYear(b)}`;
 }
 
 function ViewTab({ active, href, label }: { active: boolean; href: string; label: string }) {
@@ -142,7 +142,11 @@ function itemsForDay(items: CalItem[], day: Date): CalItem[] {
 }
 
 function timeLabel(d: Date): string {
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("en-GB", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +156,7 @@ function timeLabel(d: Date): string {
 function MonthGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
   const days = monthGridDays(cursor);
   const today = startOfDay(new Date());
-  const currentMonth = cursor.getMonth();
+  const currentMonth = watMonth(cursor);
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
@@ -166,7 +170,7 @@ function MonthGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
       <div className="grid grid-cols-7">
         {days.map((day, idx) => {
           const dayItems = itemsForDay(items, day);
-          const inMonth = day.getMonth() === currentMonth;
+          const inMonth = watMonth(day) === currentMonth;
           const isToday = isSameDay(day, today);
           return (
             <div
@@ -184,7 +188,7 @@ function MonthGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
                       : "text-black/35 dark:text-white/35"
                 }`}
               >
-                {day.getDate()}
+                {watDate(day)}
               </div>
               <div className="space-y-0.5">
                 {dayItems.slice(0, 3).map((i) => (
@@ -235,14 +239,14 @@ function WeekGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
             return (
               <div key={day.toISOString()} className="border-l border-black/10 px-1 py-2 text-center dark:border-white/10">
                 <div className="text-[11px] text-black/50 dark:text-white/50">
-                  {WEEKDAY_LABELS[(day.getDay() + 6) % 7]}
+                  {WEEKDAY_LABELS[(watDay(day) + 6) % 7]}
                 </div>
                 <div
                   className={`mx-auto mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                     isToday ? "bg-foreground font-semibold text-background" : ""
                   }`}
                 >
-                  {day.getDate()}
+                  {watDate(day)}
                 </div>
               </div>
             );

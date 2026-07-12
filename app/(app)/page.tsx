@@ -11,11 +11,16 @@ import {
   startOfDay,
   toDateParam,
 } from "@/lib/calendar";
+import { APP_TZ, watYear, watMonth, watDate } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
 function timeLabel(d: Date): string {
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("en-GB", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default async function Home() {
@@ -59,6 +64,7 @@ export default async function Home() {
           <h1 className="text-2xl font-semibold tracking-tight">Today</h1>
           <p className="mt-1 text-sm text-black/60 dark:text-white/60">
             {now.toLocaleDateString("en-GB", {
+              timeZone: APP_TZ,
               weekday: "long",
               day: "numeric",
               month: "long",
@@ -114,7 +120,7 @@ export default async function Home() {
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-black/70 dark:text-white/70">
-              {MONTH_LABELS[now.getMonth()]} {now.getFullYear()}
+              {MONTH_LABELS[watMonth(now)]} {watYear(now)}
             </h2>
             <Link
               href="/calendar"
@@ -133,7 +139,7 @@ export default async function Home() {
             </div>
             <div className="grid grid-cols-7">
               {grid.map((day, idx) => {
-                const inMonth = day.getMonth() === now.getMonth();
+                const inMonth = watMonth(day) === watMonth(now);
                 const isToday = isSameDay(day, todayStart);
                 const hasItems = daysWithItems.has(toDateParam(day));
                 return (
@@ -149,7 +155,7 @@ export default async function Home() {
                         isToday ? "bg-foreground font-semibold text-background" : ""
                       }`}
                     >
-                      {day.getDate()}
+                      {watDate(day)}
                     </span>
                     <span
                       className={`mt-0.5 h-1 w-1 rounded-full ${
