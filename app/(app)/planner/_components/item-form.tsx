@@ -153,12 +153,22 @@ export function ItemForm({
           hint={isEventReminder ? "Popup on the Google event." : "Phone alert lead time."}
         >
           <input
+            // Remount (via key) when the kind changes so a new item picks up the
+            // right default: 10 min for Event reminders, blank (at the time) for
+            // the rest. Editing keeps the saved value.
+            key={`rm-${values.id ?? "new"}-${kind}`}
             id="reminderMinutes"
             name="reminderMinutes"
             type="number"
             min="0"
             step="1"
-            defaultValue={values.reminderMinutes ?? ""}
+            defaultValue={
+              values.id
+                ? (values.reminderMinutes ?? "")
+                : isEventReminder
+                  ? "10"
+                  : ""
+            }
             placeholder="e.g. 10"
             className={controlClass}
           />
