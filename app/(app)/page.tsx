@@ -33,7 +33,7 @@ export default async function Home() {
   const gridEnd = addDays(grid[41], 1);
   const { start: monthStart, end: monthEnd } = monthRange(currentMonthString());
 
-  const [todayItems, monthItems, spend, income] = await Promise.all([
+  const [todayItemsAll, monthItems, spend, income] = await Promise.all([
     prisma.plannerItem.findMany({
       where: { startAt: { gte: todayStart, lt: todayEnd } },
       orderBy: [{ isAllDay: "desc" }, { startAt: "asc" }],
@@ -52,6 +52,12 @@ export default async function Home() {
       where: { type: "Income", date: { gte: monthStart, lt: monthEnd } },
     }),
   ]);
+
+  // Agenda shows all-day items plus timed items still upcoming today — drop the
+  // ones whose time has already passed so it isn't cluttered with stale entries.
+  const todayItems = todayItemsAll.filter(
+    (i) => i.isAllDay || !i.startAt || i.startAt.getTime() >= now.getTime(),
+  );
 
   const daysWithItems = new Set(
     monthItems.map((i) => (i.startAt ? toDateParam(i.startAt) : "")),

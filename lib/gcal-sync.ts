@@ -87,18 +87,17 @@ function fromEvent(ev: GoogleEvent): {
 // Outbound: MyScheduler → Google
 // ---------------------------------------------------------------------------
 
-// Only these planner types live on the calendar (two-way). Task/Goal stay local.
-const CALENDAR_TYPES: readonly string[] = ["Event", "Alarm", "Reminder"];
-
 /**
- * Reconcile a single item with Google Calendar. Keyed off type + start time, not
- * origin, so items synced *in* from Google can also be edited/removed here (true
- * two-way). No-ops if not connected. Best-effort — the caller wraps in try/catch
- * so a Google outage never blocks a local save.
+ * Reconcile a single item with Google Calendar. Only a Reminder whose kind is
+ * "Event" with a start time belongs on the calendar; everything else (Alarm,
+ * phone reminders, Task, Goal) is delivered to the phone or stays local. Keyed off
+ * type/kind, not origin, so events synced *in* can also be edited/removed here
+ * (true two-way). No-ops if not connected. Best-effort — the caller wraps in
+ * try/catch so a Google outage never blocks a local save.
  *
- * - calendar type + has startAt: create (no googleEventId) or patch (has one)
- * - otherwise, but has a googleEventId: it's no longer a calendar item (retyped to
- *   Task/Goal, or the time was cleared) → delete the remote event and unlink.
+ * - Event reminder + startAt: create (no googleEventId) or patch (has one)
+ * - otherwise, but has a googleEventId: no longer a calendar item (retyped, or the
+ *   kind/time changed) → delete the remote event and unlink.
  */
 export async function syncItemOutbound(itemId: string): Promise<void> {
   const account = await getAccount();
@@ -108,7 +107,8 @@ export async function syncItemOutbound(itemId: string): Promise<void> {
   if (!item) return;
 
   const cal = encodeURIComponent(account.calendarId);
-  const belongsOnCalendar = CALENDAR_TYPES.includes(item.type) && !!item.startAt;
+  const belongsOnCalendar =
+    item.type === "Reminder" && item.reminderKind === "Event" && !!item.startAt;
 
   if (!belongsOnCalendar) {
     if (item.googleEventId) {
@@ -166,7 +166,8 @@ interface EventsListResponse {
 
 export interface PullResult {
   skipped?: string;
-  upserted: number;
+  created: number;
+  updated: number;
   deleted: number;
 }
 
@@ -177,10 +178,11 @@ export interface PullResult {
  */
 export async function pullEvents(): Promise<PullResult> {
   const account = await getAccount();
-  if (!account) return { skipped: "not connected", upserted: 0, deleted: 0 };
+  if (!account) return { skipped: "not connected", created: 0, updated: 0, deleted: 0 };
 
   const cal = encodeURIComponent(account.calendarId);
-  let upserted = 0;
+  let created = 0;
+  let updated = 0;
   let deleted = 0;
   let pageToken: string | undefined;
   let newSyncToken: string | undefined;
@@ -229,11 +231,19 @@ export async function pullEvents(): Promise<PullResult> {
       const { startAt, endAt, isAllDay } = fromEvent(ev);
       if (!startAt) continue; // skip events with no usable start
 
+      // Count genuinely new inbound events vs updates (an update includes our own
+      // just-pushed events echoing back), so "Sync now" isn't misleading.
+      const existing = await prisma.plannerItem.findUnique({
+        where: { googleEventId: ev.id },
+        select: { id: true },
+      });
+
       await prisma.plannerItem.upsert({
         where: { googleEventId: ev.id },
         create: {
           name: ev.summary ?? "(no title)",
-          type: "Event",
+          type: "Reminder",
+          reminderKind: "Event",
           origin: "GoogleCalendar",
           googleEventId: ev.id,
           notes: ev.description ?? null,
@@ -249,7 +259,9 @@ export async function pullEvents(): Promise<PullResult> {
           isAllDay,
         },
       });
-      upserted += 1;
+
+      if (existing) updated += 1;
+      else created += 1;
     }
 
     pageToken = res.nextPageToken;
@@ -261,5 +273,5 @@ export async function pullEvents(): Promise<PullResult> {
     data: { lastSyncedAt: new Date(), syncToken: newSyncToken ?? account.syncToken },
   });
 
-  return { upserted, deleted };
+  return { created, updated, deleted };
 }

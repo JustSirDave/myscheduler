@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MyScheduler",
   description: "Personal planner & naira expense tracker.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "MyScheduler", statusBarStyle: "black-translucent" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export default function RootLayout({

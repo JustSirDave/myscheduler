@@ -175,40 +175,48 @@ function MonthGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
           return (
             <div
               key={idx}
-              className={`min-h-24 border-b border-r border-black/10 p-1.5 dark:border-white/10 ${
+              className={`group relative min-h-24 border-b border-r border-black/10 p-1.5 dark:border-white/10 ${
                 inMonth ? "" : "bg-black/[.02] dark:bg-white/[.02]"
               } ${idx % 7 === 6 ? "border-r-0" : ""}`}
             >
-              <div
-                className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                  isToday
-                    ? "bg-foreground font-semibold text-background"
-                    : inMonth
-                      ? "text-black/70 dark:text-white/70"
-                      : "text-black/35 dark:text-white/35"
-                }`}
-              >
-                {watDate(day)}
-              </div>
-              <div className="space-y-0.5">
-                {dayItems.slice(0, 3).map((i) => (
-                  <Link
-                    key={i.id}
-                    href={`/planner/${i.id}`}
-                    className="block truncate rounded bg-black/5 px-1.5 py-0.5 text-[11px] hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
-                    title={i.name}
-                  >
-                    {!i.isAllDay && i.startAt ? (
-                      <span className="tabular-nums opacity-60">{timeLabel(i.startAt)} </span>
-                    ) : null}
-                    {i.name}
-                  </Link>
-                ))}
-                {dayItems.length > 3 ? (
-                  <div className="px-1.5 text-[11px] text-black/40 dark:text-white/40">
-                    +{dayItems.length - 3} more
-                  </div>
-                ) : null}
+              {/* Click empty space in the cell to create on this day. */}
+              <Link
+                href={`/planner/new?date=${toDateParam(day)}`}
+                aria-label={`Add on ${toDateParam(day)}`}
+                className="absolute inset-0 z-0 transition hover:bg-black/[.03] dark:hover:bg-white/[.04]"
+              />
+              <div className="pointer-events-none relative z-10">
+                <div
+                  className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                    isToday
+                      ? "bg-foreground font-semibold text-background"
+                      : inMonth
+                        ? "text-black/70 dark:text-white/70"
+                        : "text-black/35 dark:text-white/35"
+                  }`}
+                >
+                  {watDate(day)}
+                </div>
+                <div className="space-y-0.5">
+                  {dayItems.slice(0, 3).map((i) => (
+                    <Link
+                      key={i.id}
+                      href={`/planner/${i.id}`}
+                      className="pointer-events-auto block truncate rounded bg-black/5 px-1.5 py-0.5 text-[11px] hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+                      title={i.name}
+                    >
+                      {!i.isAllDay && i.startAt ? (
+                        <span className="tabular-nums opacity-60">{timeLabel(i.startAt)} </span>
+                      ) : null}
+                      {i.name}
+                    </Link>
+                  ))}
+                  {dayItems.length > 3 ? (
+                    <div className="px-1.5 text-[11px] text-black/40 dark:text-white/40">
+                      +{dayItems.length - 3} more
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           );
@@ -300,8 +308,18 @@ function WeekGrid({ cursor, items }: { cursor: Date; items: CalItem[] }) {
                 {hours.slice(1).map((h, i) => (
                   <div
                     key={h}
-                    className="absolute inset-x-0 border-t border-black/[.06] dark:border-white/[.06]"
+                    className="pointer-events-none absolute inset-x-0 border-t border-black/[.06] dark:border-white/[.06]"
                     style={{ top: (i + 1) * HOUR_PX }}
+                  />
+                ))}
+                {/* Click an hour slot to create at that time. */}
+                {hours.slice(0, -1).map((h, i) => (
+                  <Link
+                    key={`slot-${h}`}
+                    href={`/planner/new?date=${toDateParam(day)}&time=${String(h).padStart(2, "0")}:00`}
+                    aria-label={`Add at ${String(h).padStart(2, "0")}:00`}
+                    className="absolute inset-x-0 z-0 transition hover:bg-black/[.04] dark:hover:bg-white/[.05]"
+                    style={{ top: i * HOUR_PX, height: HOUR_PX }}
                   />
                 ))}
                 {timed.map((i) => (
@@ -329,7 +347,7 @@ function WeekEvent({ item, gridHeight }: { item: CalItem; gridHeight: number }) 
   return (
     <Link
       href={`/planner/${item.id}`}
-      className="absolute inset-x-1 overflow-hidden rounded-md border border-black/10 bg-blue-500/15 px-1.5 py-0.5 text-[11px] leading-tight hover:bg-blue-500/25 dark:border-white/10"
+      className="absolute inset-x-1 z-10 overflow-hidden rounded-md border border-black/10 bg-blue-500/15 px-1.5 py-0.5 text-[11px] leading-tight hover:bg-blue-500/25 dark:border-white/10"
       style={{ top, height }}
       title={`${item.name} · ${timeLabel(start)}`}
     >

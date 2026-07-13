@@ -1,7 +1,9 @@
 import { getAccount, isConfigured } from "@/lib/google";
+import { isPushConfigured } from "@/lib/push";
 import { formatDateTime } from "@/lib/dates";
 import { SubmitButton } from "@/app/(app)/_components/form-controls";
-import { syncNow, disconnectGoogle } from "./actions";
+import { syncNow, disconnectGoogle, sendTestPush } from "./actions";
+import { PushToggle } from "./_components/push-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,7 @@ export default async function SettingsPage({
     connected?: string;
     disconnected?: string;
     synced?: string;
+    pushtest?: string;
     error?: string;
   }>;
 }) {
@@ -24,7 +27,7 @@ export default async function SettingsPage({
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Google Calendar two-way sync.
+          Google Calendar sync and phone notifications.
         </p>
       </header>
 
@@ -41,6 +44,24 @@ export default async function SettingsPage({
           <NotConnected />
         )}
       </section>
+
+      <section className="rounded-xl border border-black/10 p-5 dark:border-white/10">
+        <h2 className="mb-3 text-base font-medium">Phone notifications</h2>
+        <p className="mb-3 text-sm text-black/60 dark:text-white/60">
+          Alarms and non-event reminders are delivered here as push notifications.
+        </p>
+        <PushToggle />
+        {isPushConfigured() ? (
+          <form action={sendTestPush} className="mt-4">
+            <button
+              type="submit"
+              className="rounded-lg border border-black/15 px-3 py-1.5 text-sm transition hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/5"
+            >
+              Send test notification
+            </button>
+          </form>
+        ) : null}
+      </section>
     </main>
   );
 }
@@ -48,14 +69,32 @@ export default async function SettingsPage({
 function Banner({
   sp,
 }: {
-  sp: { connected?: string; disconnected?: string; synced?: string; error?: string };
+  sp: {
+    connected?: string;
+    disconnected?: string;
+    synced?: string;
+    pushtest?: string;
+    error?: string;
+  };
 }) {
   let message: string | null = null;
   let tone: "ok" | "err" = "ok";
 
   if (sp.connected) message = "Google Calendar connected and synced.";
   else if (sp.disconnected) message = "Google Calendar disconnected.";
-  else if (sp.synced !== undefined) message = `Synced — ${sp.synced} event(s) pulled in.`;
+  else if (sp.synced !== undefined)
+    message =
+      sp.synced === "0"
+        ? "Synced — already up to date."
+        : `Synced — ${sp.synced} new event(s) pulled in.`;
+  else if (sp.pushtest !== undefined) {
+    if (sp.pushtest === "0") {
+      message = "No devices are subscribed yet — enable notifications first.";
+      tone = "err";
+    } else {
+      message = `Test notification sent to ${sp.pushtest} device(s).`;
+    }
+  }
   else if (sp.error === "notconfigured") {
     message = "Google credentials aren't set yet. See the checklist below.";
     tone = "err";

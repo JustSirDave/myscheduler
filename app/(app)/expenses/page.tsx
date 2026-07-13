@@ -16,6 +16,7 @@ import {
   controlClass,
 } from "@/app/(app)/_components/form-controls";
 import { createExpense, deleteExpense } from "./actions";
+import { DeleteButton } from "@/app/(app)/planner/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -205,15 +206,7 @@ export default async function ExpensesPage({
                 >
                   Edit
                 </Link>
-                <form action={deleteExpense}>
-                  <input type="hidden" name="id" value={item.id} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-red-500/30 px-2.5 py-1 text-xs text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
-                  >
-                    Delete
-                  </button>
-                </form>
+                <DeleteButton action={deleteExpense} id={item.id} />
               </li>
             ))}
           </ul>

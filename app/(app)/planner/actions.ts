@@ -8,6 +8,7 @@ import { parseDateInput } from "@/lib/dates";
 import { syncItemOutbound, deleteItemOutbound } from "@/lib/gcal-sync";
 import {
   PlannerItemType,
+  ReminderKind,
   Horizon,
   Priority,
   Status,
@@ -42,9 +43,18 @@ function parsePlannerData(formData: FormData) {
   const type = oneOf(PlannerItemType, formData.get("type"));
   if (!name || !type) return null;
 
+  // reminderKind only applies to Reminders; default to General.
+  const reminderKind =
+    type === PlannerItemType.Reminder
+      ? (oneOf(ReminderKind, formData.get("reminderKind")) ?? ReminderKind.General)
+      : null;
+
+  // The form only renders the fields relevant to the chosen type, so anything not
+  // submitted parses to null — which correctly clears it when the type changes.
   return {
     name,
     type,
+    reminderKind,
     project: nullableStr(formData.get("project")),
     startAt: parseDateInput(formData.get("startAt")),
     endAt: parseDateInput(formData.get("endAt")),
@@ -54,7 +64,10 @@ function parsePlannerData(formData: FormData) {
     status: oneOf(Status, formData.get("status")) ?? Status.NotStarted,
     notes: nullableStr(formData.get("notes")),
     reminderMinutes: nullableInt(formData.get("reminderMinutes")),
+    targetDate: parseDateInput(formData.get("targetDate")),
     linkedGoalId: nullableStr(formData.get("linkedGoalId")),
+    // Re-arm phone delivery on every save (e.g. rescheduling a fired reminder).
+    notifiedAt: null,
   };
 }
 

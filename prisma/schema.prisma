@@ -15,11 +15,20 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum PlannerItemType {
-  Event
-  Alarm
   Reminder
+  Alarm
   Task
   Goal
+}
+
+// What a Reminder is about. "Event" reminders sync to Google Calendar; every
+// other kind is delivered to the phone via Web Push.
+enum ReminderKind {
+  Event
+  Habit
+  StartGoal
+  ContinueGoal
+  General
 }
 
 enum Horizon {
@@ -59,9 +68,18 @@ model PlannerItem {
   status   Status          @default(NotStarted)
   notes    String?
 
-  // Lead time in minutes for a popup notification on the pushed Google event.
-  // Used by Event/Alarm/Reminder when synced out; null = Google's default.
+  // For Reminder items: what the reminder is about (drives calendar-vs-phone).
+  reminderKind ReminderKind?
+
+  // Lead time in minutes: an Event reminder's Google popup, or how far before
+  // startAt a phone reminder/alarm fires. null = at the time / Google default.
   reminderMinutes Int?
+
+  // Target date for Goal items.
+  targetDate DateTime?
+
+  // When a phone reminder/alarm was pushed (so the sender doesn't re-fire it).
+  notifiedAt DateTime?
 
   // Self-relation: a Task/TimeBlock can ladder up to a Goal.
   linkedGoalId String?
@@ -79,6 +97,15 @@ model PlannerItem {
   @@index([type])
   @@index([status])
   @@index([startAt])
+}
+
+// A browser/phone Web Push subscription (single user, but a device each).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------
