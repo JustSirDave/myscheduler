@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireSession } from "@/lib/session";
+import { hasValidSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 // Store (or update) a Web Push subscription for this browser/device.
 export async function POST(request: NextRequest) {
-  await requireSession();
+  if (!(await hasValidSession())) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const body = await request.json().catch(() => null);
   const sub = body?.subscription;
@@ -23,7 +25,9 @@ export async function POST(request: NextRequest) {
 
 // Remove a subscription (device turned notifications off).
 export async function DELETE(request: NextRequest) {
-  await requireSession();
+  if (!(await hasValidSession())) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const endpoint = body?.endpoint;
   if (typeof endpoint === "string") {

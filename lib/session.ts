@@ -14,3 +14,11 @@ export async function requireSession(): Promise<void> {
     redirect("/login");
   }
 }
+
+// Non-redirecting session check for fetch-called API routes, so an unauthenticated
+// request gets a clean 401 instead of a 307 the client fetch would silently follow
+// to /login (and mistake for success).
+export async function hasValidSession(): Promise<boolean> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return verifySessionToken(token);
+}

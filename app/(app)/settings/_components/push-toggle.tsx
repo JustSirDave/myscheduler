@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Status = "loading" | "unsupported" | "denied" | "off" | "on";
+type Status = "loading" | "unsupported" | "denied" | "off" | "on" | "error";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -11,6 +11,22 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+// Store the subscription on the server. Returns false on any non-OK / redirected
+// response so a silent failure can't masquerade as success.
+async function storeSubscription(sub: PushSubscription): Promise<boolean> {
+  try {
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub }),
+      credentials: "same-origin",
+    });
+    return res.ok && !res.redirected;
+  } catch {
+    return false;
+  }
 }
 
 export function PushToggle() {
@@ -27,9 +43,15 @@ export function PushToggle() {
       setStatus("denied");
       return;
     }
+    // If this device already has a browser subscription, make sure the server has
+    // it too (self-heal — the original store POST may have failed).
     navigator.serviceWorker.getRegistration().then(async (reg) => {
       const sub = reg ? await reg.pushManager.getSubscription() : null;
-      setStatus(sub ? "on" : "off");
+      if (sub) {
+        setStatus((await storeSubscription(sub)) ? "on" : "error");
+      } else {
+        setStatus("off");
+      }
     });
   }, []);
 
@@ -48,15 +70,10 @@ export function PushToggle() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: sub }),
-      });
-      setStatus(res.ok ? "on" : "off");
+      setStatus((await storeSubscription(sub)) ? "on" : "error");
     } catch (e) {
       console.error("Enable push failed:", e);
-      setStatus("off");
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -72,6 +89,7 @@ export function PushToggle() {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),
+          credentials: "same-origin",
         });
         await sub.unsubscribe();
       }
@@ -94,13 +112,18 @@ export function PushToggle() {
   }
 
   const dot =
-    status === "on" ? "bg-green-500" : status === "denied" ? "bg-red-500" : "bg-yellow-500";
+    status === "on"
+      ? "bg-green-500"
+      : status === "denied" || status === "error"
+        ? "bg-red-500"
+        : "bg-yellow-500";
   const labels: Record<Status, string> = {
     loading: "Checking…",
     unsupported: "This browser doesn’t support notifications.",
     denied: "Notifications are blocked in your browser settings.",
     off: "Not enabled on this device.",
     on: "Enabled on this device.",
+    error: "Couldn’t register this device. Tap to try again.",
   };
 
   return (
@@ -109,14 +132,14 @@ export function PushToggle() {
         <span className={`inline-block h-2 w-2 rounded-full ${dot}`} aria-hidden />
         <span>{labels[status]}</span>
       </div>
-      {status === "off" && (
+      {(status === "off" || status === "error") && (
         <button
           type="button"
           onClick={enable}
           disabled={busy}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
         >
-          {busy ? "Enabling…" : "Enable phone notifications"}
+          {busy ? "Enabling…" : status === "error" ? "Try again" : "Enable phone notifications"}
         </button>
       )}
       {status === "on" && (
