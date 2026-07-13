@@ -24,12 +24,12 @@ export async function GET(request: NextRequest) {
     where: {
       notifiedAt: null,
       startAt: { gte: staleFloor },
-      OR: [{ type: "Alarm" }, { type: "Reminder", reminderKind: { not: "Event" } }],
+      type: "Reminder",
+      reminderKind: { not: "Event" }, // Event reminders go to Google, not the phone
     },
     select: {
       id: true,
       name: true,
-      type: true,
       startAt: true,
       reminderMinutes: true,
     },
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (fireAt > now.getTime()) continue; // not due yet
 
     const sent = await sendPushToAll({
-      title: item.type === "Alarm" ? "⏰ Alarm" : "🔔 Reminder",
+      title: "🔔 Reminder",
       body: item.name,
       url: "/planner",
     });

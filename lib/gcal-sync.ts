@@ -89,8 +89,8 @@ function fromEvent(ev: GoogleEvent): {
 
 /**
  * Reconcile a single item with Google Calendar. Only a Reminder whose kind is
- * "Event" with a start time belongs on the calendar; everything else (Alarm,
- * phone reminders, Task, Goal) is delivered to the phone or stays local. Keyed off
+ * "Event" with a start time belongs on the calendar; everything else (phone
+ * reminders, Task, Goal) is delivered to the phone or stays local. Keyed off
  * type/kind, not origin, so events synced *in* can also be edited/removed here
  * (true two-way). No-ops if not connected. Best-effort — the caller wraps in
  * try/catch so a Google outage never blocks a local save.

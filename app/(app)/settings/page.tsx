@@ -48,7 +48,7 @@ export default async function SettingsPage({
       <section className="rounded-xl border border-black/10 p-5 dark:border-white/10">
         <h2 className="mb-3 text-base font-medium">Phone notifications</h2>
         <p className="mb-3 text-sm text-black/60 dark:text-white/60">
-          Alarms and non-event reminders are delivered here as push notifications.
+          Non-event reminders are delivered here as push notifications.
         </p>
         <PushToggle />
         {isPushConfigured() ? (

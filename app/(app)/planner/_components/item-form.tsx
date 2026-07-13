@@ -64,7 +64,6 @@ export function ItemForm({
   const isEventReminder = isReminder && kind === ReminderKind.Event;
   const isGoalReminder =
     isReminder && (kind === ReminderKind.StartGoal || kind === ReminderKind.ContinueGoal);
-  const isAlarm = type === PlannerItemType.Alarm;
   const isTask = type === PlannerItemType.Task;
   const isGoal = type === PlannerItemType.Goal;
 
@@ -119,7 +118,7 @@ export function ItemForm({
       </div>
 
       {/* Time — label depends on type */}
-      {(isReminder || isAlarm || isTask) && (
+      {(isReminder || isTask) && (
         <Field
           label={isTask ? "Due" : isEventReminder ? "Start" : "Time"}
           htmlFor="startAt"
@@ -256,14 +255,12 @@ export function ItemForm({
         </Field>
       )}
 
-      {/* Notes — everything except Alarm */}
-      {!isAlarm && (
-        <div className="sm:col-span-2">
-          <Field label="Notes" htmlFor="notes">
-            <textarea id="notes" name="notes" rows={3} defaultValue={values.notes ?? ""} className={controlClass} />
-          </Field>
-        </div>
-      )}
+      {/* Notes */}
+      <div className="sm:col-span-2">
+        <Field label="Notes" htmlFor="notes">
+          <textarea id="notes" name="notes" rows={3} defaultValue={values.notes ?? ""} className={controlClass} />
+        </Field>
+      </div>
 
       <div className="sm:col-span-2">
         <SubmitButton>{submitLabel}</SubmitButton>
